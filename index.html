@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Samir - Combat Pokémon 1v1</title>
+  <style>
+    body {
+      background: linear-gradient(to bottom, #1a1a1a, #333);
+      background-attachment: fixed;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    .card-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .card {
+      background-color: #222;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 10px;
+      box-shadow: 0 0 10px #444;
+    }
+    .card img {
+      width: 120px;
+      height: 120px;
+    }
+    .battlefield {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-top: 40px;
+      height: 300px;
+    }
+    .pokemon {
+      position: relative;
+      width: 200px;
+    }
+    .pokemon img {
+      width: 200px;
+      height: 200px;
+      transition: transform 0.2s;
+    }
+    .health-bar {
+      height: 10px;
+      background: green;
+      margin-top: 5px;
+      border-radius: 5px;
+    }
+    .attack-button {
+      margin: 5px;
+      padding: 12px 25px;
+      background-color: #555;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s ease-in-out, transform 0.2s;
+    }
+    .attack-button:hover {
+      background-color: #777;
+      transform: scale(1.05);
+    }
+    .attack-button:active {
+      transform: scale(0.95);
+    }
+    .damage-text {
+      animation: shake 0.5s;
+    }
+    @keyframes shake {
+      0% { transform: translateX(0); }
+      20% { transform: translateX(-10px); }
+      40% { transform: translateX(10px); }
+      60% { transform: translateX(-10px); }
+      80% { transform: translateX(10px); }
+      100% { transform: translateX(0); }
+    }
+    .hearts::after {
+      content: "❤️";
+      position: absolute;
+      font-size: 24px;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      animation: float 1s ease-in-out;
+    }
+    @keyframes float {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-30px) scale(1.5); }
+    }
+    @keyframes specialAttack {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.5; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .special-attack {
+      animation: specialAttack 0.5s ease-in-out;
+    }
+  </style>
+</head>
+<body>
+  <h1>Samir - Combat Pokémon 1v1</h1>
+  <div id="cards" class="card-container"></div>
+  <button onclick="startBattle()">Commencer le combat</button>
+  <div id="battlefield" class="battlefield" style="display:none"></div>
+  <div id="actions"></div>
+  <div id="result"></div>
+
+  <script>
+    const validPokemon = [1, 4, 7, 10, 13, 16, 19, 21, 25, 27, 29, 32, 35, 37, 39, 41, 43, 46, 48, 50];
+    const attackTypes = {
+      fire: ["Flamme", "Lance-Flammes", "Brasier", "Feu sauvage"],
+      water: ["Écume", "Pistolet à O", "Torrent", "Aqua Jet"],
+      grass: ["Fouet lianes", "Tranch'herbe", "Synthèse", "Canon Graine"],
+      electric: ["Éclair", "Fatal-Foudre", "Cage-éclair", "Tonnerre"],
+      normal: ["Charge", "Rugissement", "Coup de tête", "Écrasement"]
+    };
+    let player = null;
+    let opponent = null;
+    let playerHP = 100;
+    let opponentHP = 100;
+
+    async function getPokemon(id) {
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
+      return await res.json();
+    }
+
+    async function loadCards() {
+      const ids = [
+        validPokemon[Math.floor(Math.random() * validPokemon.length)],
+        validPokemon[Math.floor(Math.random() * validPokemon.length)]
+      ];
+      player = await getPokemon(ids[0]);
+      opponent = await getPokemon(ids[1]);
+      document.getElementById("cards").innerHTML = `
+        <div class="card">
+          <h2>Ton Pokémon: ${player.name}</h2>
+          <img src="${player.sprites.front_default}" />
+        </div>
+        <div class="card">
+          <h2>Adversaire: ${opponent.name}</h2>
+          <img src="${opponent.sprites.front_default}" />
+        </div>
+      `;
+    }
+
+    function startBattle() {
+      document.getElementById("cards").style.display = "none";
+      document.getElementById("battlefield").style.display = "flex";
+      document.getElementById("battlefield").innerHTML = `
+        <div class="pokemon">
+          <h3>${player.name}</h3>
+          <img id="playerImg" src="${player.sprites.front_default}" />
+          <div class="health-bar" id="playerHP" style="width: 100%"></div>
+        </div>
+        <div class="pokemon">
+          <h3>${opponent.name}</h3>
+          <img id="opponentImg" src="${opponent.sprites.front_default}" />
+          <div class="health-bar" id="opponentHP" style="width: 100%"></div>
+        </div>
+      `;
+      showActions();
+    }
+
+    function showActions() {
+      const type = player.types[0].type.name;
+      const moves = attackTypes[type] || attackTypes.normal;
+      let buttons = moves.map(name => `
+        <button class="attack-button" onclick="attack('${name}', false)">${name}</button>
+      `).join("");
+      buttons += `<button class="attack-button" onclick="attack('Soin', true)">Soin</button>`;
+      document.getElementById("actions").innerHTML = buttons;
+    }
+
+    function updateHealthBars() {
+      document.getElementById("playerHP").style.width = `${playerHP}%`;
+      document.getElementById("opponentHP").style.width = `${opponentHP}%`;
+    }
+
+    function animateAttack(targetId, type) {
+      const element = document.getElementById(targetId);
+      if (type === "heal") {
+        element.classList.add("hearts");
+        setTimeout(() => element.classList.remove("hearts"), 1000);
+      } else {
+        element.classList.add("damage-text");
+        setTimeout(() => element.classList.remove("damage-text"), 500);
+      }
+    }
+
+    function animateSpecialAttack(targetId) {
+      const element = document.getElementById(targetId);
+      element.classList.add("special-attack");
+      setTimeout(() => element.classList.remove("special-attack"), 500);
+    }
+
+    function attack(name, isHeal) {
+      if (isHeal) {
+        playerHP = Math.min(100, playerHP + 30);
+        animateAttack("playerImg", "heal");
+      } else {
+        let damage = Math.floor(Math.random() * 25) + 5;
+        opponentHP = Math.max(0, opponentHP - damage);
+        animateSpecialAttack("opponentImg");
+        animateAttack("opponentImg", "damage");
+      }
+      updateHealthBars();
+      setTimeout(aiAttack, 1000);
+      checkVictory();
+    }
+
+    function aiAttack() {
+      let isHeal = Math.random() < 0.2;
+      if (isHeal) {
+        opponentHP = Math.min(100, opponentHP + 30);
+        animateAttack("opponentImg", "heal");
+      } else {
+        let damage = Math.floor(Math.random() * 25) + 5;
+        playerHP = Math.max(0, playerHP - damage);
+        animateSpecialAttack("playerImg");
+        animateAttack("playerImg", "damage");
+      }
+      updateHealthBars();
+      checkVictory();
+    }
+
+    function checkVictory() {
+      if (playerHP <= 0) {
+        document.getElementById("result").innerHTML = `<h2>Tu as perdu !</h2>
+        <button onclick="location.reload()">Rejouer</button>
+        <button onclick="loadCards()">Changer de Pokémon</button>`;
+        document.getElementById("actions").innerHTML = "";
+      } else if (opponentHP <= 0) {
+        document.getElementById("result").innerHTML = `<h2>Victoire ! Tu remportes le Trophée SAMIR !</h2>
+        <button onclick="location.reload()">Rejouer</button>
+        <button onclick="loadCards()">Changer de Pokémon</button>`;
+        document.getElementById("actions").innerHTML = "";
+      }
+    }
+
+    loadCards();
+  </script>
+</body>
+</html>
+
+
